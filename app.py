@@ -12,11 +12,15 @@ import os
 import glob
 import re
 import numpy as np
+from PIL import Image
 
 # Keras
 from keras.applications.imagenet_utils import preprocess_input, decode_predictions
 from keras.models import load_model
 from keras.preprocessing import image
+from keras.layers import Dense, Activation, Conv2D, MaxPooling2D, Flatten, Dropout, BatchNormalization
+from keras.optimizers import SGD
+from keras import regularizers
 
 # Flask utils
 from flask import Flask, redirect, url_for, request, render_template
@@ -25,29 +29,36 @@ from gevent.pywsgi import WSGIServer
 
 # Define a flask app
 app = Flask(__name__)
-
+#UPLOAD_FOLDER = 'uploads'
 # Model saved with Keras model.save()
-#MODEL_PATH = 'G:\\deloitte technoutsav\\ML MODEL\\models\\model.h5'
+MODEL_PATH = 'models/model.h5'
 
 # Load your trained model
 from keras.models import load_model
 from keras.models import model_from_json
 import json
 
-json_file = open('G:\\deloitte technoutsav\\ML MODEL\\models\\model.json','r')
-loaded_model_json = json_file.read()
-json_file.close()
+with open('models/model.json','r') as f:
+    model_json = json.load(f)
 
-loaded_model = model_from_json(loaded_model_json)
+model = model_from_json(model_json)
+model.load_weights('models/model.h5')
+
+#loaded_model = model_from_json(loaded_model_json)
 
 # load weights into new model
 
-loaded_model.load_weights("G:\\deloitte technoutsav\\ML MODEL\\models\\model.h5")
+#loaded_model=load_weights("G:\\deloitte technoutsav\\ML MODEL\\models\\model.h5")
+with open('models/model.json','r') as f:
+    model_json = json.load(f)
+
+model = model_from_json(model_json)
+#model.load_weights('model_weights.h5')
 print("Loaded Model from disk")
-#model = load_model(MODEL_PATH)
-#model._make_predict_function()          # Necessary
+model.load_weights(MODEL_PATH)
+model._make_predict_function()          # Necessary
 print('Model loaded. Start serving...')
-loaded_model.compile(loss='categorical_crossentropy',optimizer='adam',metrics=['accuracy'])
+#loaded_model.compile(loss='categorical_crossentropy',optimizer='adam',metrics=['accuracy'])
 
 # You can also use pretrained model from Keras
 # Check https://keras.io/applications/
@@ -57,15 +68,16 @@ loaded_model.compile(loss='categorical_crossentropy',optimizer='adam',metrics=['
 print('Model loaded. Check http://127.0.0.1:5000/')
 
 
-def model_predict(img_path, loaded_model):
-    img = Image.open(image_path)
+def model_predict(img_path, model):
+    img = Image.open(img_path)
     size = (64, 64)
-    img = img.resize(size, PIL.Image.ANTIALIAS)  
+    img = img.resize(size, Image.ANTIALIAS)  
     img_array = np.array(img)
     img_array = img_array/255
     img_array=img_array.reshape(1,64,64,3)
     #plt.imshow(img)
-    y=loaded_model.predict(img_array)
+    y=model.predict(img_array)
+    print(y)
     if y[0][0]>=0.5:
         return "Healthy pepper belly plant"
     else:
@@ -75,6 +87,7 @@ def model_predict(img_path, loaded_model):
 @app.route('/', methods=['GET'])
 def index():
     # Main page
+    print('hello')
     return render_template('index.html')
 
 
@@ -89,9 +102,11 @@ def upload():
         file_path = os.path.join(
             basepath, 'uploads', secure_filename(f.filename))
         f.save(file_path)
+        print(file_path)
 
         # Make prediction
-        preds = model_predict(file_path, loaded_model)
+        preds = model_predict(file_path, model)
+        print(preds)
 
         # Process your result for human
         # pred_class = preds.argmax(axis=-1)            # Simple argmax
